@@ -117,7 +117,7 @@ const CONFIG = {
   ASC_MAX_RUN_RESTARTS: 3,
   ASC_PATTERN_BEEPS: 1
 };
-const BUILD_ID = "2026-11-04 #25";
+const BUILD_ID = "2026-11-04 #26";
 function buildTagHTML() { return ' <span class="small">build ' + esc(BUILD_ID) + "</span>"; }
 
 /* ============================================================
@@ -503,7 +503,27 @@ function getBandsToTest() {
   if (Array.isArray(bandsToTest) && bandsToTest.length) return bandsToTest.slice();
   return CONFIG.BANDS_HZ.slice();
 }
-let debugAnswers = true;
+let debugAnswers = false;
+function wireDebugToggle(box, warnId) {
+  // Debug reveals the right answers, so enabling takes two deliberate
+  // checks: the first only shows the warning, the second turns it on.
+  // The choice is session-only — every launch starts with debug off.
+  if (!box) return;
+  const warn = (typeof document !== "undefined" && document.getElementById) ? document.getElementById(warnId) : null;
+  box.checked = debugAnswers;
+  if (warn && warn.style) warn.style.display = debugAnswers ? "" : "none";
+  box.onchange = function () {
+    if (!box.checked) { debugAnswers = false; box._dbgArmed = false; if (warn && warn.style) warn.style.display = "none"; return; }
+    if (!box._dbgArmed) {
+      box._dbgArmed = true;
+      box.checked = false;
+      if (warn && warn.style) warn.style.display = "";
+      return;
+    }
+    debugAnswers = true;
+    if (warn && warn.style) warn.style.display = "";
+  };
+}
 let debugLog = [];
 function dlog(s) {
   try {
@@ -1196,6 +1216,7 @@ function showBandSnapshot(cfg) {
       '<p><b>How should we measure?</b> One button each — tap to choose for this session. 4FC means four choices: left/right ear × long tone/two beeps. Your choice is remembered.</p>' +
       '<div class="row"><button id="snapModeAscBtn"></button><button id="snapModeStairBtn"></button></div>' +
       '<p><label class="small"><input type="checkbox" id="snapDbg"> Show the right answer after each trial (debug)</label></p>' +
+      '<div class="flag" id="snapDbgWarn" style="display:none"><b>Debug is for testing the app, not for real sessions:</b> the right answer shows after each trial.</div>' +
       '<div class="row"><button id="snapGo" class="primary">' + esc(cfg.cta || "Continue") + "</button>" + (cfg.secondaryLabel ? '<button id="snapAlt" class="quiet">' + esc(cfg.secondaryLabel) + "</button>" : "") + "</div>" +
       '<p class="small" id="snapHint"></p>';
     function chosen() {
@@ -1229,8 +1250,7 @@ function showBandSnapshot(cfg) {
     };
     const alt = document.getElementById("snapAlt");
     if (alt) alt.onclick = function () { resolve({ secondary: true }); };
-    const sdbg = document.getElementById("snapDbg");
-    if (sdbg) { sdbg.checked = debugAnswers; sdbg.onchange = function () { debugAnswers = !!sdbg.checked; }; }
+    wireDebugToggle(document.getElementById("snapDbg"), "snapDbgWarn");
     const smS = document.getElementById("snapModeStairBtn");
     const smA = document.getElementById("snapModeAscBtn");
     if (smS) smS.onclick = function () { saveMode("staircase"); paintModeButtons("snapModeStairBtn", "snapModeAscBtn"); };
@@ -2725,15 +2745,14 @@ function showHome() {
       "<p>First, a warm-up: a beep repeats while you raise a slider from silent until you just hear it, at each pitch in each ear. Then the real measurement: two quick beeps or a single longer tone plays in one ear, and you answer both <i>which ear</i> and <i>which pattern</i> — that two-part answer is the measurement. Everything starts silent and climbs only with your input; nothing ever starts loud.</p>" +
       "<p>Set aside about 20\u201330 undisturbed minutes. If your ears tire, pause between pitches — a guess is useful data, but a rested guess is better.</p></div>" +
       '<p><label class="small"><input type="checkbox" id="dbg"> Show the right answer after each trial (debug)</label></p>' +
+      '<div class="flag" id="dbgWarn" style="display:none"><b>Debug is for testing the app, not for real sessions:</b> the right answer shows after each trial.</div>' +
       '<button id="start" class="primary">Start</button><button id="importJsonBtn" class="quiet">Import JSON</button>' +
       '<input type="file" id="importFile" accept=".json,application/json" style="display:none">' +
       '<p class="muted">' + buildTagHTML() + "</p>";
     document.getElementById("start").onclick = function () { startSession(); };
     document.getElementById("importJsonBtn").onclick = function () { const fi = document.getElementById("importFile"); if (fi) fi.click(); };
     document.getElementById("importFile").onchange = function () { handleImportFiles(document.getElementById("importFile").files); };
-    const dbg0 = document.getElementById("dbg");
-    dbg0.checked = debugAnswers;
-    dbg0.onchange = function () { debugAnswers = !!dbg0.checked; };
+    wireDebugToggle(document.getElementById("dbg"), "dbgWarn");
   } else {
     const last = allSessions[allSessions.length - 1];
     let histList = "";
@@ -2768,6 +2787,7 @@ function showHome() {
       "<p><b>What should we measure next?</b></p>" +
       '<div class="bandpick">' + homeBoxes + "</div>" +
       '<p><label class="small"><input type="checkbox" id="dbg"> Show the right answer after each trial (debug)</label></p>' +
+      '<div class="flag" id="dbgWarn" style="display:none"><b>Debug is for testing the app, not for real sessions:</b> the right answer shows after each trial.</div>' +
       '<p><b>Saved:</b> ' + esc(storedDataLine(allSessions)) + " in this browser. Last session " + esc(fmtDate(last.date)) + " · " + esc(sessionModeLabel(last)) + ". " +
       '<label>Start from: <select id="srcSel"><option value="last">Continue from most recent data</option><option value="sliders"' + (srcIsSliders ? " selected" : "") + ">Fresh slider checks</option></select></label></p>" +
       '<div class="row"><button id="startAsc" class="primary"><b>Start — Ascending tone ★ Recommended</b><br><small>rises until you tap the side</small></button><button id="startStair" class="primary"><b>Start — Staircase (4FC)</b><br><small>which ear + which pattern</small></button></div>' +
@@ -2788,9 +2808,7 @@ function showHome() {
     if (importFile) importFile.onchange = function () { handleImportFiles(importFile.files); };
     const resetBtn = document.getElementById("resetBtn");
     if (resetBtn) resetBtn.onclick = function () { showResetScreen(); };
-    const dbg1 = document.getElementById("dbg");
-    dbg1.checked = debugAnswers;
-    dbg1.onchange = function () { debugAnswers = !!dbg1.checked; };
+    wireDebugToggle(document.getElementById("dbg"), "dbgWarn");
     const srcSel = document.getElementById("srcSel");
     if (srcSel) srcSel.onchange = function () { saveStartSource(srcSel.value === "sliders" ? "sliders" : "last"); };
     function homeRefreshBands() {
