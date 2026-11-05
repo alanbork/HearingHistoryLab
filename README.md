@@ -11,6 +11,8 @@ compare with your own past measurements, on your own equipment.
 Everything is relative to your own history. The app never claims
 absolute or clinical values.
 
+Live test at this URL https://alanbork.github.io/HearingHistoryLab/hearing_history_lab.html
+
 ## Why history is the whole point
 
 A single session is a snapshot; only repeat sessions show whether your
